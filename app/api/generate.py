@@ -18,8 +18,10 @@ async def generate_image(request: ImageGenerateRequest):
         
         # 2. Get the specific image URL for this prompt
         # Pollinations.ai is deterministic with seed, providing a stable 1:1 mapping
+        # AI Specialist 정명우: negative_prompt를 반영하여 품질을 향상시킵니다.
         generated_url = await image_service.generate_image_url(
             prompt=request.prompt,
+            negative_prompt=request.negative_prompt,
             width=request.width,
             height=request.height
         )
