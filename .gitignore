@@ -1,3 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS
+.DS_Store
+
+# Empty init files (requested)
+**/__init__.py
+
+# Frontend
 node_modules/
 dist/
 *.tsbuildinfo
