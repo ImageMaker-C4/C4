@@ -13,3 +13,8 @@ ENV/
 
 # Empty init files (requested)
 **/__init__.py
+
+# Frontend
+node_modules/
+dist/
+*.tsbuildinfo

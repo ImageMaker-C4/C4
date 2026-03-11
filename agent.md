@@ -9,7 +9,7 @@
 ## 2. 팀 구성 및 역할 분담 (Team Roles)
 
 ### Agent: Frontend Lead (하동건)
-- React/Next.js 기반 웹 UI 개발
+- React/Vite 기반 웹 UI 개발
 - 프롬프트 입력창 및 실시간 이미지 렌더링 구현
 - 챗 형식의 인터페이스 및 상태 관리
 
