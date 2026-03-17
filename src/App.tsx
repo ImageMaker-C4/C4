@@ -1,170 +1,160 @@
-type ReferenceCard = {
-  title: string;
-  subtitle: string;
-  tone: string;
+import { useState, useRef } from 'react';
+
+type Message = {
+  id: string;
+  type: 'user' | 'ai';
+  content?: string;
+  imageUrl?: string;
+  isLoading?: boolean;
 };
 
-type HistoryItem = {
-  name: string;
-  status: string;
-  accent: string;
-};
-
-const references: ReferenceCard[] = [
-  {
-    title: '피사체',
-    subtitle: '도시 감성의 핸드드립 바를 위한 메인 컷',
-    tone: 'amber',
-  },
-  {
-    title: '장면',
-    subtitle: '새벽빛, 곡선 유리, 따뜻한 안개가 흐르는 스튜디오',
-    tone: 'mint',
-  },
-  {
-    title: '스타일',
-    subtitle: '광택 금속, 소프트 필름 노이즈, 광고 스틸 라이팅',
-    tone: 'violet',
-  },
-];
-
-const history: HistoryItem[] = [
-  { name: 'Hero frame A', status: '방금 생성됨', accent: 'amber' },
-  { name: 'Story variation', status: '리믹스 준비', accent: 'mint' },
-  { name: 'Mobile crop', status: '다운로드 가능', accent: 'violet' },
-];
-
-const gallery = [
-  '라운지 톤의 제품 히어로',
-  '밝은 포스터형 탐색안',
-  'SNS 스토리용 타이트 컷',
-  '제품 소개 섹션용 배너',
-];
+async function generateImage(prompt: string): Promise<string> {
+  const res = await fetch('https://fal.run/fal-ai/fast-lightning-sdxl', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${import.meta.env.VITE_FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prompt, image_size: 'square_hd', num_inference_steps: 4 }),
+  });
+  if (!res.ok) throw new Error(`fal.ai error: ${res.status}`);
+  const data = await res.json();
+  return data.images[0].url;
+}
 
 function App() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [prompt, setPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    const el = chatContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
+  const handleGenerate = async () => {
+    if (isGenerating || !prompt.trim()) return;
+
+    const currentPrompt = prompt;
+    const userMsgId = Date.now().toString();
+    const aiMsgId = (Date.now() + 1).toString();
+
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, type: 'user', content: currentPrompt },
+      { id: aiMsgId, type: 'ai', isLoading: true },
+    ]);
+    setPrompt('');
+    setIsGenerating(true);
+    setHasStarted(true);
+    setTimeout(scrollToBottom, 50);
+
+    try {
+      const imageUrl = await generateImage(currentPrompt);
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false, imageUrl } : m));
+    } catch (e) {
+      console.error('[C4] Generation failed:', e);
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleGenerate();
+    }
+  };
+
+  const startNewChat = () => {
+    setMessages([]);
+    setHasStarted(false);
+    setPrompt('');
+  };
+
   return (
     <div className="app-shell">
-      <div className="ambient ambient-left" />
-      <div className="ambient ambient-right" />
+      <aside className="chat-sidebar">
+        <button className="new-chat-btn" onClick={startNewChat}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          New Chat
+        </button>
 
-      <aside className="sidebar">
-        <div>
-          <p className="eyebrow">C4 / image lab</p>
-          <h1>Whisk-inspired client workspace</h1>
-          <p className="sidebar-copy">
-            참고 이미지와 프롬프트를 한 화면에서 조합해 빠르게 생성 흐름을 확인할 수
-            있게 구성했어.
-          </p>
+        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--line)' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>C4 AI Image Lab v0.1</p>
         </div>
-
-        <section className="sidebar-panel upload-panel">
-          <div>
-            <p className="panel-label">애셋</p>
-            <h2>이미지를 드래그해 보세요</h2>
-          </div>
-          <p className="panel-copy">
-            피사체, 장면, 스타일 이미지를 올리고 프롬프트에서 바로 참조하는 흐름을
-            강조했어.
-          </p>
-          <button className="ghost-button">이미지 업로드</button>
-        </section>
-
-        <section className="sidebar-panel history-panel">
-          <div className="panel-heading-row">
-            <p className="panel-label">기록</p>
-            <span className="pill">최근 3개</span>
-          </div>
-          <div className="history-list">
-            {history.map((item) => (
-              <article className={`history-card ${item.accent}`} key={item.name}>
-                <div>
-                  <h3>{item.name}</h3>
-                  <p>{item.status}</p>
-                </div>
-                <button>열기</button>
-              </article>
-            ))}
-          </div>
-        </section>
       </aside>
 
       <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">프로젝트 화면</p>
-            <h2>참고 이미지 + 프롬프트 + 결과 갤러리</h2>
-          </div>
-          <div className="topbar-actions">
-            <button className="ghost-button">프로젝트 다운로드</button>
-            <button className="primary-button">공유 링크 생성</button>
-          </div>
-        </header>
+        <div className="ambient ambient-left" />
+        <div className="ambient ambient-right" />
 
-        <section className="reference-strip">
-          {references.map((card) => (
-            <article className={`reference-card ${card.tone}`} key={card.title}>
-              <div className="reference-art" />
-              <div>
-                <p className="panel-label">{card.title}</p>
-                <h3>{card.subtitle}</h3>
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="prompt-dock">
-          <div className="prompt-heading">
-            <div>
-              <p className="panel-label">프롬프트</p>
-              <h3>describe an idea or start with subject, scene, style</h3>
+        {!hasStarted ? (
+          <section className="landing-hero" style={{ zIndex: 5 }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <p className="eyebrow">C4 / AI IMAGE LAB</p>
+              <h1 style={{ fontFamily: 'Syne', fontWeight: 800 }}>Imagination to Visuals</h1>
+              <p className="sidebar-copy" style={{ fontSize: '1.1rem', maxWidth: '560px', margin: '1.2rem auto 0', lineHeight: 1.8, opacity: 0.7 }}>
+                머릿속에 있는 장면을 텍스트로 풀어보세요.<br />
+                어떤 스타일이든, 어떤 분위기든 이미지로 만들어드립니다.
+              </p>
             </div>
-            <div className="dock-controls">
-              <span>가로세로 비율 16:9</span>
-              <span>시드 2048</span>
-              <span>설정 high fidelity</span>
-            </div>
-          </div>
-
-          <div className="prompt-box">
-            <p>
-              새벽 안개가 남아 있는 유리 바에서 브러시드 스틸 커피 메이커가 은은하게
-              빛나고, 따뜻한 호박색 하이라이트와 광고 사진 같은 깊은 콘트라스트를 만든다.
-            </p>
-          </div>
-
-          <div className="prompt-actions">
-            <button className="ghost-button">이미지 추가</button>
-            <button className="ghost-button">애니메이션 적용</button>
-            <button className="primary-button">생성</button>
-          </div>
-        </section>
-
-        <section className="gallery-section">
-          <div className="panel-heading-row">
-            <div>
-              <p className="panel-label">결과</p>
-              <h3>리믹스 가능한 생성 결과</h3>
-            </div>
-            <button className="ghost-button">모든 이미지 다운로드</button>
-          </div>
-
-          <div className="gallery-grid">
-            {gallery.map((item, index) => (
-              <article className="gallery-card" key={item}>
-                <div className={`gallery-visual gradient-${index + 1}`}>
-                  <span>{index + 1}</span>
-                </div>
-                <div className="gallery-meta">
-                  <div>
-                    <h4>{item}</h4>
-                    <p>세부정보 추가 또는 수정하기</p>
+          </section>
+        ) : (
+          <div className="chat-messages" ref={chatContainerRef} style={{ zIndex: 5 }}>
+            {messages.map((msg) => (
+              <div key={msg.id} className={msg.type === 'user' ? 'bubble-user' : 'bubble-ai'}>
+                {msg.type === 'user' ? (
+                  <p>{msg.content}</p>
+                ) : (
+                  <div className="ai-image-wrapper">
+                    {msg.isLoading
+                      ? <div className="ai-image-skeleton" />
+                      : msg.imageUrl
+                        ? <img src={msg.imageUrl} alt="AI Generated" onLoad={scrollToBottom} />
+                        : <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>이미지 생성에 실패했습니다. 다시 시도해보세요.</p>
+                    }
                   </div>
-                  <button>리믹스</button>
-                </div>
-              </article>
+                )}
+              </div>
             ))}
           </div>
-        </section>
+        )}
+
+        <div className="prompt-dock-fixed">
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="prompt-textarea-chat"
+            placeholder="어떤 이미지를 만들어드릴까요?"
+            rows={1}
+          />
+          <button
+            className="send-button"
+            onClick={handleGenerate}
+            disabled={isGenerating || !prompt.trim()}
+          >
+            {isGenerating ? (
+              <div className="loading-dots" style={{ padding: 0 }}>
+                <div className="dot" style={{ background: '#10131f' }} />
+                <div className="dot" style={{ background: '#10131f' }} />
+                <div className="dot" style={{ background: '#10131f' }} />
+              </div>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            )}
+          </button>
+        </div>
       </main>
     </div>
   );
