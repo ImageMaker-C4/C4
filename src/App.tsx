@@ -1,134 +1,69 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 
 type Message = {
   id: string;
   type: 'user' | 'ai';
   content?: string;
   imageUrl?: string;
-  timestamp: Date;
   isLoading?: boolean;
 };
 
-type ImageHistory = {
-  id: string;
-  prompt: string;
-  url: string;
-  created_at: string;
-};
+async function generateImage(prompt: string): Promise<string> {
+  const res = await fetch('https://fal.run/fal-ai/fast-lightning-sdxl', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${import.meta.env.VITE_FAL_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prompt, image_size: 'square_hd', num_inference_steps: 4 }),
+  });
+  if (!res.ok) throw new Error(`fal.ai error: ${res.status}`);
+  const data = await res.json();
+  return data.images[0].url;
+}
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [history, setHistory] = useState<ImageHistory[]>([]);
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isGenerating]);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const fetchHistory = async () => {
-    try {
-      const response = await fetch('/api/gallery');
-      const data = await response.json();
-      const items = Array.isArray(data) ? data : [];
-      setHistory(items);
-      
-      // If we have history, show the last few as messages if the user hasn't started a fresh chat
-      if (items.length > 0 && !hasStarted) {
-        const initialMessages: Message[] = [];
-        // Just show the last one to keep it clean
-        const last = items[0];
-        initialMessages.push({
-          id: `u-${last.id}`,
-          type: 'user',
-          content: last.prompt,
-          timestamp: new Date(last.created_at)
-        });
-        initialMessages.push({
-          id: `a-${last.id}`,
-          type: 'ai',
-          imageUrl: last.url,
-          timestamp: new Date(last.created_at)
-        });
-        setMessages(initialMessages);
-        setHasStarted(true);
-      }
-    } catch (error) {
-      console.error('Failed to fetch history:', error);
-    }
+    const el = chatContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   };
 
   const handleGenerate = async () => {
     if (isGenerating || !prompt.trim()) return;
-    
+
     const currentPrompt = prompt;
     const userMsgId = Date.now().toString();
     const aiMsgId = (Date.now() + 1).toString();
-    
-    // 1. Add user message immediately
-    const newUserMsg: Message = {
-      id: userMsgId,
-      type: 'user',
-      content: currentPrompt,
-      timestamp: new Date()
-    };
-    
-    // 2. Add loading AI message
-    const newAiLoadingMsg: Message = {
-      id: aiMsgId,
-      type: 'ai',
-      isLoading: true,
-      timestamp: new Date()
-    };
 
-    setMessages(prev => [...prev, newUserMsg, newAiLoadingMsg]);
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, type: 'user', content: currentPrompt },
+      { id: aiMsgId, type: 'ai', isLoading: true },
+    ]);
     setPrompt('');
     setIsGenerating(true);
     setHasStarted(true);
+    setTimeout(scrollToBottom, 50);
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: currentPrompt }),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // 3. Update the loading message with actual content
-        setMessages(prev => prev.map(msg => 
-          msg.id === aiMsgId 
-            ? { ...msg, isLoading: false, imageUrl: data.url, id: data.id } 
-            : msg
-        ));
-        // Update history sidebar
-        setHistory(prev => [data, ...prev]);
-      } else {
-        setMessages(prev => prev.filter(msg => msg.id !== aiMsgId));
-        console.error('Generation failed');
-      }
-    } catch (error) {
-      setMessages(prev => prev.filter(msg => msg.id !== aiMsgId));
-      console.error('Failed to generate image:', error);
+      const imageUrl = await generateImage(currentPrompt);
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false, imageUrl } : m));
+    } catch (e) {
+      console.error('[C4] Generation failed:', e);
+      setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false } : m));
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleGenerate();
     }
@@ -150,21 +85,6 @@ function App() {
           </svg>
           New Chat
         </button>
-        
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <p className="eyebrow" style={{ marginBottom: '1rem', paddingLeft: '0.5rem' }}>Recent History</p>
-          {history.map(item => (
-            <button 
-              key={item.id} 
-              className="history-item-btn"
-              onClick={() => {
-                setPrompt(item.prompt);
-              }}
-            >
-              {item.prompt}
-            </button>
-          ))}
-        </div>
 
         <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--line)' }}>
           <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>C4 AI Image Lab v0.1</p>
@@ -176,51 +96,39 @@ function App() {
         <div className="ambient ambient-right" />
 
         {!hasStarted ? (
-          <section className="landing-hero" style={{ z-index: 5 }}>
+          <section className="landing-hero" style={{ zIndex: 5 }}>
             <div style={{ marginBottom: '2rem' }}>
               <p className="eyebrow">C4 / AI IMAGE LAB</p>
               <h1 style={{ fontFamily: 'Syne', fontWeight: 800 }}>Imagination to Visuals</h1>
-              <p className="sidebar-copy" style={{ fontSize: '1.2rem', maxWidth: '600px', margin: '1rem auto' }}>
-                설명만으로 놀라운 이미지를 만들어보세요. 
-                왼쪽 히스토리에서 이전 작업을 확인하거나, 바로 채팅을 시작할 수 있습니다.
+              <p className="sidebar-copy" style={{ fontSize: '1.1rem', maxWidth: '560px', margin: '1.2rem auto 0', lineHeight: 1.8, opacity: 0.7 }}>
+                머릿속에 있는 장면을 텍스트로 풀어보세요.<br />
+                어떤 스타일이든, 어떤 분위기든 이미지로 만들어드립니다.
               </p>
             </div>
           </section>
         ) : (
-          <div className="chat-messages" style={{ zIndex: 5 }}>
+          <div className="chat-messages" ref={chatContainerRef} style={{ zIndex: 5 }}>
             {messages.map((msg) => (
               <div key={msg.id} className={msg.type === 'user' ? 'bubble-user' : 'bubble-ai'}>
                 {msg.type === 'user' ? (
                   <p>{msg.content}</p>
                 ) : (
                   <div className="ai-image-wrapper">
-                    {msg.isLoading ? (
-                      <div className="ai-image-skeleton" />
-                    ) : (
-                      <img src={msg.imageUrl} alt="AI Generated" onLoad={scrollToBottom} />
-                    )}
-                    {!msg.isLoading && (
-                      <div className="ai-meta">
-                        <span>{msg.timestamp.toLocaleTimeString()}</span>
-                        <button 
-                          className="ghost-button" 
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} 
-                          onClick={() => setPrompt(messages.find(m => m.id === `u-${msg.id}`)?.content || "")}
-                        >
-                          Remix
-                        </button>
-                      </div>
-                    )}
+                    {msg.isLoading
+                      ? <div className="ai-image-skeleton" />
+                      : msg.imageUrl
+                        ? <img src={msg.imageUrl} alt="AI Generated" onLoad={scrollToBottom} />
+                        : <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>이미지 생성에 실패했습니다. 다시 시도해보세요.</p>
+                    }
                   </div>
                 )}
               </div>
             ))}
-            <div ref={messagesEndRef} />
           </div>
         )}
 
         <div className="prompt-dock-fixed">
-          <textarea 
+          <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -228,8 +136,8 @@ function App() {
             placeholder="어떤 이미지를 만들어드릴까요?"
             rows={1}
           />
-          <button 
-            className="send-button" 
+          <button
+            className="send-button"
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
           >
