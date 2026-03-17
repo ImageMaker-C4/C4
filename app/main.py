@@ -1,5 +1,10 @@
 from fastapi import FastAPI
 from app.api import generate, images, gallery
+from app.db.database import engine, Base
+from app.models import image  # Import models to register them with Base
+
+# Create tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Image Generation API")
 
