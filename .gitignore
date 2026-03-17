@@ -11,6 +11,11 @@ ENV/
 # OS
 .DS_Store
 
+# Local dev tools
+.claude/
+.omc/
+sql_app.db
+
 # Empty init files (requested)
 **/__init__.py
 
