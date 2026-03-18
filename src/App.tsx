@@ -9,15 +9,21 @@ type Message = {
 };
 
 async function generateImage(prompt: string): Promise<string> {
-  const seed = Math.floor(Math.random() * 1000000);
-  const encoded = encodeURIComponent(prompt);
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${seed}`;
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(url);
-    img.onerror = () => reject(new Error('Image load failed'));
-    img.src = url;
+  const formData = new FormData();
+  formData.append('prompt', prompt);
+  formData.append('output_format', 'jpeg');
+
+  const res = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_STABILITY_KEY}`,
+      'Accept': 'image/*',
+    },
+    body: formData,
   });
+  if (!res.ok) throw new Error(`Stability AI error: ${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 function App() {
@@ -131,7 +137,7 @@ function App() {
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             className="prompt-textarea-chat"
-            placeholder="Describe the image you want to create (English works best)"
+            placeholder="어떤 이미지를 만들어드릴까요?"
             rows={1}
           />
           <button
