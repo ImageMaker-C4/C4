@@ -32,7 +32,15 @@ function App() {
   const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = (url: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `c4-${Date.now()}.jpg`;
+    a.click();
+  };
 
   const scrollToBottom = () => {
     const el = chatContainerRef.current;
@@ -149,7 +157,7 @@ function App() {
                     {msg.isLoading
                       ? <div className="ai-image-skeleton" />
                       : msg.imageUrl
-                        ? <img src={msg.imageUrl} alt="AI Generated" onLoad={scrollToBottom} />
+                        ? <img src={msg.imageUrl} alt="AI Generated" onLoad={scrollToBottom} style={{ cursor: 'zoom-in' }} onClick={() => setLightboxUrl(msg.imageUrl!)} />
                         : <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>이미지 생성에 실패했습니다. 다시 시도해보세요.</p>
                     }
                   </div>
@@ -189,6 +197,21 @@ function App() {
           </button>
         </div>
       </main>
+      {lightboxUrl && (
+        <div className="lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <img src={lightboxUrl} alt="AI Generated" />
+            <button type="button" className="lightbox-download" onClick={() => handleDownload(lightboxUrl)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              다운로드
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
