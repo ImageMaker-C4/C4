@@ -9,17 +9,15 @@ type Message = {
 };
 
 async function generateImage(prompt: string): Promise<string> {
-  const res = await fetch('https://fal.run/fal-ai/fast-lightning-sdxl', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Key ${import.meta.env.VITE_FAL_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ prompt, image_size: 'square_hd', num_inference_steps: 4 }),
+  const seed = Math.floor(Math.random() * 1000000);
+  const encoded = encodeURIComponent(prompt);
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&nologo=true&seed=${seed}`;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => reject(new Error('Image load failed'));
+    img.src = url;
   });
-  if (!res.ok) throw new Error(`fal.ai error: ${res.status}`);
-  const data = await res.json();
-  return data.images[0].url;
 }
 
 function App() {
@@ -133,7 +131,7 @@ function App() {
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             className="prompt-textarea-chat"
-            placeholder="어떤 이미지를 만들어드릴까요?"
+            placeholder="Describe the image you want to create (English works best)"
             rows={1}
           />
           <button
