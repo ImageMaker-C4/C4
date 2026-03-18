@@ -21,7 +21,10 @@ async function generateImage(prompt: string): Promise<string> {
     },
     body: formData,
   });
-  if (!res.ok) throw new Error(`Stability AI error: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Stability AI error: ${res.status}${errText ? ' - ' + errText : ''}`);
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }
@@ -168,9 +171,14 @@ function App() {
         )}
 
         <div className="prompt-dock-fixed">
+          {prompt.length > 400 && (
+            <span style={{ position: 'absolute', top: '-1.6rem', right: '1rem', fontSize: '0.75rem', color: prompt.length > 490 ? '#ff6b6b' : 'var(--muted)' }}>
+              {prompt.length}/500
+            </span>
+          )}
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => setPrompt(e.target.value.slice(0, 500))}
             onKeyDown={handleKeyDown}
             className="prompt-textarea-chat"
             placeholder="어떤 이미지를 만들어드릴까요?"
