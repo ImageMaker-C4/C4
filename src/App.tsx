@@ -169,6 +169,7 @@ function App() {
             rows={1}
           />
           <button
+            type="button"
             className="send-button"
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
