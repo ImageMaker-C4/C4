@@ -29,6 +29,7 @@ async function generateImage(prompt: string): Promise<string> {
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState('');
+  const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -56,7 +57,8 @@ function App() {
     setTimeout(scrollToBottom, 50);
 
     try {
-      const imageUrl = await generateImage(currentPrompt);
+      const finalPrompt = style.trim() ? `${currentPrompt}, ${style.trim()}` : currentPrompt;
+      const imageUrl = await generateImage(finalPrompt);
       setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, isLoading: false, imageUrl } : m));
     } catch (e) {
       console.error('[C4] Generation failed:', e);
@@ -89,6 +91,32 @@ function App() {
           </svg>
           New Chat
         </button>
+
+        <div style={{ marginTop: '1.5rem' }}>
+          <p className="eyebrow" style={{ marginBottom: '0.6rem', paddingLeft: '0.25rem' }}>Style</p>
+          <input
+            type="text"
+            value={style}
+            onChange={(e) => setStyle(e.target.value)}
+            placeholder="e.g. Disney, Cyberpunk, Watercolor"
+            style={{
+              width: '100%',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid var(--line)',
+              borderRadius: '0.75rem',
+              padding: '0.6rem 0.8rem',
+              color: 'var(--text)',
+              fontSize: '0.85rem',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          {style.trim() && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.4rem', paddingLeft: '0.25rem' }}>
+              매 요청에 적용 중
+            </p>
+          )}
+        </div>
 
         <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--line)' }}>
           <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>C4 AI Image Lab v0.1</p>
